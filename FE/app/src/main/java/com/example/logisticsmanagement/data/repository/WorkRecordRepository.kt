@@ -106,7 +106,7 @@ class WorkRecordRepository {
     suspend fun getWorkRecordsByDateRange(
         companyId: String,
         startDate: Date,
-        endDate: Dated
+        endDate: Date
     ): Result<List<WorkRecord>> {
         return try {
             val snapshot = firestore.collection("work_records")
