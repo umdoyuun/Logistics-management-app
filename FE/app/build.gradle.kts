@@ -2,22 +2,23 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.gms.google-services")
-    id("kotlin-kapt")
+    // id("kotlin-kapt")  // ← 이 줄 삭제 또는 주석처리
     id("kotlin-parcelize")
 }
 
 android {
-    namespace = "com.logistics.management"
+    namespace = "com.example.logisticsmanagement"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.logistics.management"
-        minSdk = 24
+        applicationId = "com.example.logisticsmanagement"
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        multiDexEnabled = true
     }
 
     buildTypes {
@@ -41,7 +42,18 @@ android {
 
     buildFeatures {
         viewBinding = true
-        dataBinding = true
+        // dataBinding = true  // ← 이 줄도 삭제 (KAPT 필요)
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/DEPENDENCIES"
+            excludes += "/META-INF/LICENSE"
+            excludes += "/META-INF/LICENSE.txt"
+            excludes += "/META-INF/NOTICE"
+            excludes += "/META-INF/NOTICE.txt"
+        }
     }
 }
 
@@ -53,11 +65,13 @@ dependencies {
     implementation("androidx.activity:activity:1.8.2")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 
+    // Multidex 지원
+    implementation("androidx.multidex:multidex:2.0.1")
+
     // Firebase BOM (버전 관리)
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
-    implementation("com.google.firebase:firebase-storage-ktx")
     implementation("com.google.firebase:firebase-analytics-ktx")
 
     // ViewModel & LiveData (MVVM)
@@ -78,9 +92,8 @@ dependencies {
     // 날짜 처리
     implementation("com.jakewharton.threetenabp:threetenabp:1.4.6")
 
-    // 엑셀 파일 처리
-    implementation("org.apache.poi:poi:5.2.4")
-    implementation("org.apache.poi:poi-ooxml:5.2.4")
+    // CSV 파일 생성용
+    implementation("com.opencsv:opencsv:5.8")
 
     // 로딩 다이얼로그
     implementation("com.airbnb.android:lottie:6.2.0")
