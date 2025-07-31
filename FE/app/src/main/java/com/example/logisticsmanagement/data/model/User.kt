@@ -16,7 +16,8 @@ data class User(
     val phoneNumber: String = "",
     val companyId: String = "",
     val role: UserRole = UserRole.WORKER,
-    val isActive: Boolean = true,
+    val active: Boolean = true,        // isActive -> active로 변경
+    val stability: Int = 0,            // stability 필드 추가
     @ServerTimestamp
     val createdAt: Date? = null,
     @ServerTimestamp

@@ -17,7 +17,8 @@ data class Distributor(
     val phone: String = "",
     val email: String = "",
     val contactPerson: String = "",
-    val isActive: Boolean = true,
+    val active: Boolean = true,     // isActive -> active로 변경
+    val stability: Int = 0,         // stability 필드 추가 (Firebase 경고 해결)
     @ServerTimestamp
     val createdAt: Date? = null,
     @ServerTimestamp
