@@ -1,5 +1,6 @@
 package com.example.logisticsmanagement.ui.work
 
+import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -15,6 +16,7 @@ class WorkRecordViewModel : ViewModel() {
     private val authRepository = AuthRepository()
     private val workRecordRepository = WorkRecordRepository()
     private val distributorRepository = DistributorRepository()
+    private val TAG = "WorkRecordViewModel"
 
     // 유통사 목록
     private val _distributors = MutableLiveData<List<Distributor>>()
@@ -49,23 +51,29 @@ class WorkRecordViewModel : ViewModel() {
     val currentUser: LiveData<User?> = _currentUser
 
     init {
+        Log.d(TAG, "WorkRecordViewModel 초기화")
         loadCurrentUser()
         loadDistributors()
     }
 
     // 현재 사용자 로드
     private fun loadCurrentUser() {
+        Log.d(TAG, "현재 사용자 로드 시작")
         viewModelScope.launch {
             try {
                 val result = authRepository.getCurrentUserProfile()
                 if (result.isSuccess) {
                     _currentUser.value = result.getOrNull()
+                    Log.d(TAG, "현재 사용자: ${_currentUser.value?.name}")
                     // 사용자 정보가 로드되면 작업 기록도 로드
                     _currentUser.value?.let { user ->
                         loadTodayWorkRecords(user.companyId)
                     }
+                } else {
+                    Log.e(TAG, "사용자 정보 로드 실패")
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "사용자 정보 로드 중 예외", e)
                 _errorMessage.value = "사용자 정보를 불러올 수 없습니다: ${e.message}"
             }
         }
@@ -73,15 +81,20 @@ class WorkRecordViewModel : ViewModel() {
 
     // 유통사 목록 로드
     fun loadDistributors() {
+        Log.d(TAG, "유통사 목록 로드 시작")
         viewModelScope.launch {
             try {
                 val result = distributorRepository.getAllActiveDistributors()
                 if (result.isSuccess) {
-                    _distributors.value = result.getOrNull() ?: emptyList()
+                    val distributorList = result.getOrNull() ?: emptyList()
+                    _distributors.value = distributorList
+                    Log.d(TAG, "유통사 목록 로드 완료: ${distributorList.size}개")
                 } else {
+                    Log.e(TAG, "유통사 목록 로드 실패")
                     _errorMessage.value = "유통사 목록을 불러올 수 없습니다"
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "유통사 목록 로드 중 예외", e)
                 _errorMessage.value = "유통사 목록 로드 중 오류가 발생했습니다: ${e.message}"
             }
         }
@@ -89,16 +102,21 @@ class WorkRecordViewModel : ViewModel() {
 
     // 오늘 작업 기록 로드
     fun loadTodayWorkRecords(companyId: String) {
+        Log.d(TAG, "오늘 작업 기록 로드 시작: $companyId")
         _isLoading.value = true
         viewModelScope.launch {
             try {
                 val result = workRecordRepository.getWorkRecordsByDate(companyId, Date())
                 if (result.isSuccess) {
-                    _workRecords.value = result.getOrNull() ?: emptyList()
+                    val records = result.getOrNull() ?: emptyList()
+                    _workRecords.value = records
+                    Log.d(TAG, "오늘 작업 기록 로드 완료: ${records.size}개")
                 } else {
+                    Log.e(TAG, "작업 기록 로드 실패")
                     _errorMessage.value = "작업 기록을 불러올 수 없습니다"
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "작업 기록 로드 중 예외", e)
                 _errorMessage.value = "작업 기록 로드 중 오류가 발생했습니다: ${e.message}"
             } finally {
                 _isLoading.value = false
@@ -127,21 +145,29 @@ class WorkRecordViewModel : ViewModel() {
 
     // 작업 기록 저장
     fun saveWorkRecord(request: WorkRecordRequest) {
+        Log.d(TAG, "작업 기록 저장 시작")
+        Log.d(TAG, "요청 데이터: distributorId=${request.distributorId}, totalPallets=${request.totalPallets}")
+
         val currentUser = _currentUser.value
         if (currentUser == null) {
+            Log.e(TAG, "현재 사용자 정보가 없음")
             _errorMessage.value = "사용자 정보가 없습니다"
             return
         }
 
         if (!validateWorkRecordRequest(request)) {
+            Log.e(TAG, "입력 유효성 검증 실패")
             return
         }
 
         val distributor = _distributors.value?.find { it.id == request.distributorId }
         if (distributor == null) {
+            Log.e(TAG, "유통사 정보를 찾을 수 없음: ${request.distributorId}")
             _errorMessage.value = "유통사 정보를 찾을 수 없습니다"
             return
         }
+
+        Log.d(TAG, "유통사 정보: ${distributor.name}")
 
         _isLoading.value = true
         viewModelScope.launch {
@@ -160,15 +186,21 @@ class WorkRecordViewModel : ViewModel() {
                     createdByName = currentUser.name
                 )
 
+                Log.d(TAG, "생성된 WorkRecord: $workRecord")
+
                 val result = workRecordRepository.saveWorkRecord(workRecord)
                 _saveResult.value = result
 
                 if (result.isSuccess) {
+                    Log.d(TAG, "작업 기록 저장 성공")
                     // 저장 성공 시 목록 새로고침
                     loadTodayWorkRecords(currentUser.companyId)
+                } else {
+                    Log.e(TAG, "작업 기록 저장 실패: ${result.exceptionOrNull()?.message}")
                 }
 
             } catch (e: Exception) {
+                Log.e(TAG, "작업 기록 저장 중 예외", e)
                 _saveResult.value = Result.failure(e)
                 _errorMessage.value = "작업 기록 저장 중 오류가 발생했습니다: ${e.message}"
             } finally {
@@ -227,6 +259,7 @@ class WorkRecordViewModel : ViewModel() {
 
     // 작업 기록 삭제
     fun deleteWorkRecord(workRecord: WorkRecord) {
+        Log.d(TAG, "작업 기록 삭제 시작: ${workRecord.id}")
         _isLoading.value = true
         viewModelScope.launch {
             try {
@@ -234,13 +267,17 @@ class WorkRecordViewModel : ViewModel() {
                 _deleteResult.value = result
 
                 if (result.isSuccess) {
+                    Log.d(TAG, "작업 기록 삭제 성공")
                     // 삭제 성공 시 목록 새로고침
                     _currentUser.value?.let { user ->
                         loadTodayWorkRecords(user.companyId)
                     }
+                } else {
+                    Log.e(TAG, "작업 기록 삭제 실패")
                 }
 
             } catch (e: Exception) {
+                Log.e(TAG, "작업 기록 삭제 중 예외", e)
                 _deleteResult.value = Result.failure(e)
                 _errorMessage.value = "작업 기록 삭제 중 오류가 발생했습니다: ${e.message}"
             } finally {
@@ -260,8 +297,8 @@ class WorkRecordViewModel : ViewModel() {
                 _errorMessage.value = "파렛트 수는 0보다 커야 합니다"
                 return false
             }
-            request.items.isNotEmpty() && request.items.sumOf { it.quantity } != request.totalPallets -> {
-                _errorMessage.value = "품목별 수량의 합계가 총 파렛트 수와 일치하지 않습니다"
+            request.items.isNotEmpty() && request.items.sumOf { it.quantity } > request.totalPallets -> {
+                _errorMessage.value = "품목별 수량의 합계가 총 파렛트 수를 초과할 수 없습니다"
                 return false
             }
         }

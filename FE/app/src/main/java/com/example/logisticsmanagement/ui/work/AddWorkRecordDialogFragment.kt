@@ -2,6 +2,7 @@ package com.example.logisticsmanagement.ui.work
 
 import android.app.DatePickerDialog
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -23,24 +24,35 @@ class AddWorkRecordDialogFragment : DialogFragment() {
 
     private lateinit var viewModel: WorkRecordViewModel
     private var selectedDate = Date()
+    private val TAG = "AddWorkRecordDialog"
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        Log.d(TAG, "onCreateView 호출")
         _binding = DialogAddWorkRecordBinding.inflate(inflater, container, false)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        Log.d(TAG, "onViewCreated 호출")
 
-        viewModel = ViewModelProvider(requireParentFragment())[WorkRecordViewModel::class.java]
+        try {
+            // requireParentFragment() 대신 requireActivity() 사용
+            viewModel = ViewModelProvider(requireActivity())[WorkRecordViewModel::class.java]
+            Log.d(TAG, "ViewModel 생성 성공")
 
-        setupUI()
-        setupObservers()
-        setupClickListeners()
+            setupUI()
+            setupObservers()
+            setupClickListeners()
+            Log.d(TAG, "초기화 완료")
+        } catch (e: Exception) {
+            Log.e(TAG, "초기화 중 오류", e)
+            Toast.makeText(context, "다이얼로그 초기화 오류: ${e.message}", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun setupUI() {
@@ -52,13 +64,17 @@ class AddWorkRecordDialogFragment : DialogFragment() {
 
     private fun setupObservers() {
         viewModel.distributors.observe(viewLifecycleOwner) { distributors ->
-            val adapter = ArrayAdapter(
-                requireContext(),
-                android.R.layout.simple_spinner_item,
-                distributors.map { it.name }
-            )
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-            binding.spinnerDistributor.adapter = adapter
+            if (distributors.isNotEmpty()) {
+                val adapter = ArrayAdapter(
+                    requireContext(),
+                    android.R.layout.simple_spinner_item,
+                    distributors.map { it.name }
+                )
+                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                binding.spinnerDistributor.adapter = adapter
+            } else {
+                Toast.makeText(context, "유통사 목록이 비어있습니다. 먼저 유통사를 추가해주세요.", Toast.LENGTH_LONG).show()
+            }
         }
 
         viewModel.saveResult.observe(viewLifecycleOwner) { result ->
@@ -124,7 +140,19 @@ class AddWorkRecordDialogFragment : DialogFragment() {
         }
 
         val selectedDistributor = distributors[selectedDistributorIndex]
-        val totalPallets = binding.etTotalPallets.text.toString().toIntOrNull() ?: 0
+        val totalPalletsText = binding.etTotalPallets.text.toString().trim()
+
+        if (totalPalletsText.isEmpty()) {
+            Toast.makeText(context, "총 파렛트 수를 입력해주세요", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val totalPallets = totalPalletsText.toIntOrNull() ?: 0
+        if (totalPallets <= 0) {
+            Toast.makeText(context, "파렛트 수는 0보다 커야 합니다", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         val notes = binding.etNotes.text.toString().trim()
 
         // 간단한 품목 입력 (선택사항)

@@ -1,5 +1,6 @@
 package com.example.logisticsmanagement.data.repository
 
+import android.util.Log
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Transaction
 import com.example.logisticsmanagement.data.firebase.FirebaseManager
@@ -12,115 +13,120 @@ class WorkRecordRepository {
 
     private val firestore = FirebaseManager.firestore
     private val monthlySummaryRepository = MonthlySummaryRepository()
+    private val TAG = "WorkRecordRepository"
 
-    // 작업 기록 저장 (실시간 월별 집계 업데이트 포함)
+    // 작업 기록 저장 (트랜잭션 간소화)
     suspend fun saveWorkRecord(workRecord: WorkRecord): Result<String> {
         return try {
-            firestore.runTransaction { transaction ->
-                // 1. 일일 작업 기록 저장
-                val workRecordRef = firestore.collection("work_records").document()
-                val recordWithId = workRecord.copy(id = workRecordRef.id)
-                transaction.set(workRecordRef, recordWithId)
+            Log.d(TAG, "작업 기록 저장 시작: ${workRecord.distributorName} - ${workRecord.totalPallets}파렛트")
 
-                // 2. 월별 집계 데이터 업데이트
-                updateMonthlySummaryInTransaction(transaction, recordWithId, isAdd = true)
+            // 일단 단순하게 저장만 (트랜잭션 없이)
+            val workRecordRef = firestore.collection("work_records").document()
+            val recordWithId = workRecord.copy(id = workRecordRef.id)
 
-                workRecordRef.id
-            }.await()
+            Log.d(TAG, "Firestore에 저장할 데이터: $recordWithId")
+            workRecordRef.set(recordWithId).await()
+            Log.d(TAG, "작업 기록 저장 완료: ${workRecordRef.id}")
 
-            Result.success("작업 기록이 저장되었습니다")
+            Result.success(workRecordRef.id)
         } catch (e: Exception) {
+            Log.e(TAG, "작업 기록 저장 실패", e)
             Result.failure(e)
         }
     }
 
-    // 작업 기록 수정
+    // 작업 기록 수정 (단순화)
     suspend fun updateWorkRecord(oldRecord: WorkRecord, newRecord: WorkRecord): Result<Unit> {
         return try {
-            firestore.runTransaction { transaction ->
-                // 1. 일일 작업 기록 수정
-                val workRecordRef = firestore.collection("work_records").document(newRecord.id)
-                transaction.set(workRecordRef, newRecord)
+            Log.d(TAG, "작업 기록 수정 시작: ${newRecord.id}")
 
-                // 2. 월별 데이터에서 기존 데이터 차감
-                updateMonthlySummaryInTransaction(transaction, oldRecord, isAdd = false)
+            val workRecordRef = firestore.collection("work_records").document(newRecord.id)
+            workRecordRef.set(newRecord).await()
 
-                // 3. 월별 데이터에 새 데이터 추가
-                updateMonthlySummaryInTransaction(transaction, newRecord, isAdd = true)
-
-                Unit
-            }.await()
-
+            Log.d(TAG, "작업 기록 수정 완료: ${newRecord.id}")
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e(TAG, "작업 기록 수정 실패", e)
             Result.failure(e)
         }
     }
 
-    // 작업 기록 삭제
+    // 작업 기록 삭제 (단순화)
     suspend fun deleteWorkRecord(workRecord: WorkRecord): Result<Unit> {
         return try {
-            firestore.runTransaction { transaction ->
-                // 1. 일일 작업 기록 삭제
-                val workRecordRef = firestore.collection("work_records").document(workRecord.id)
-                transaction.delete(workRecordRef)
+            Log.d(TAG, "작업 기록 삭제 시작: ${workRecord.id}")
 
-                // 2. 월별 데이터에서 차감
-                updateMonthlySummaryInTransaction(transaction, workRecord, isAdd = false)
+            val workRecordRef = firestore.collection("work_records").document(workRecord.id)
+            workRecordRef.delete().await()
 
-                Unit
-            }.await()
-
+            Log.d(TAG, "작업 기록 삭제 완료: ${workRecord.id}")
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e(TAG, "작업 기록 삭제 실패", e)
             Result.failure(e)
         }
     }
 
-    // 특정 날짜의 작업 기록 조회
+    // 특정 날짜의 작업 기록 조회 (모든 orderBy 제거)
     suspend fun getWorkRecordsByDate(
         companyId: String,
         date: Date
     ): Result<List<WorkRecord>> {
         return try {
-            val startOfDay = DateUtils.getStartOfDay(date)
-            val endOfDay = DateUtils.getEndOfDay(date)
+            Log.d(TAG, "작업 기록 조회 시작: $companyId, $date")
 
+            // 조건 없이 해당 회사의 모든 작업 기록 조회 (임시)
             val snapshot = firestore.collection("work_records")
                 .whereEqualTo("companyId", companyId)
-                .whereGreaterThanOrEqualTo("workDate", startOfDay)
-                .whereLessThanOrEqualTo("workDate", endOfDay)
-                .orderBy("workDate", Query.Direction.DESCENDING)
-                .orderBy("workTime", Query.Direction.DESCENDING)
                 .get()
                 .await()
 
-            val records = snapshot.toObjects(WorkRecord::class.java)
-            Result.success(records)
+            val allRecords = snapshot.toObjects(WorkRecord::class.java)
+            Log.d(TAG, "전체 작업 기록 수: ${allRecords.size}")
+
+            // 클라이언트에서 날짜 필터링 및 정렬
+            val startOfDay = DateUtils.getStartOfDay(date)
+            val endOfDay = DateUtils.getEndOfDay(date)
+
+            val filteredRecords = allRecords.filter { record ->
+                record.workDate.time >= startOfDay.time && record.workDate.time <= endOfDay.time
+            }.sortedWith(compareByDescending<WorkRecord> { it.workDate }.thenByDescending { it.workTime })
+
+            Log.d(TAG, "필터링된 작업 기록 수: ${filteredRecords.size}")
+            Result.success(filteredRecords)
         } catch (e: Exception) {
+            Log.e(TAG, "작업 기록 조회 실패", e)
             Result.failure(e)
         }
     }
 
-    // 기간별 작업 기록 조회
+    // 기간별 작업 기록 조회 (인덱스 오류 방지를 위해 단순화)
     suspend fun getWorkRecordsByDateRange(
         companyId: String,
         startDate: Date,
         endDate: Date
     ): Result<List<WorkRecord>> {
         return try {
+            Log.d(TAG, "기간별 작업 기록 조회: $companyId, $startDate ~ $endDate")
+
+            // 조건 없이 해당 회사의 모든 작업 기록 조회 (임시)
             val snapshot = firestore.collection("work_records")
                 .whereEqualTo("companyId", companyId)
-                .whereGreaterThanOrEqualTo("workDate", startDate)
-                .whereLessThanOrEqualTo("workDate", endDate)
-                .orderBy("workDate", Query.Direction.DESCENDING)
-                .orderBy("workTime", Query.Direction.DESCENDING)
                 .get()
                 .await()
 
-            val records = snapshot.toObjects(WorkRecord::class.java)
-            Result.success(records)
+            val allRecords = snapshot.toObjects(WorkRecord::class.java)
+            Log.d(TAG, "전체 작업 기록 수: ${allRecords.size}")
+
+            // 클라이언트에서 날짜 필터링 및 정렬
+            val filteredRecords = allRecords.filter { record ->
+                record.workDate.time >= startDate.time && record.workDate.time <= endDate.time
+            }.sortedWith(compareByDescending<WorkRecord> { it.workDate }.thenByDescending { it.workTime })
+
+            Log.d(TAG, "필터링된 기간별 작업 기록 수: ${filteredRecords.size}")
+            Result.success(filteredRecords)
         } catch (e: Exception) {
+            Log.e(TAG, "기간별 작업 기록 조회 실패", e)
             Result.failure(e)
         }
     }
@@ -135,20 +141,19 @@ class WorkRecordRepository {
             val snapshot = firestore.collection("work_records")
                 .whereEqualTo("companyId", companyId)
                 .whereEqualTo("distributorId", distributorId)
-                .orderBy("workDate", Query.Direction.DESCENDING)
-                .orderBy("workTime", Query.Direction.DESCENDING)
                 .limit(limit.toLong())
                 .get()
                 .await()
 
             val records = snapshot.toObjects(WorkRecord::class.java)
+                .sortedWith(compareByDescending<WorkRecord> { it.workDate }.thenByDescending { it.workTime })
             Result.success(records)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    // 최근 작업 기록 조회 (대시보드용)
+    // 최근 작업 기록 조회
     suspend fun getRecentWorkRecords(
         companyId: String,
         limit: Int = 10
@@ -156,51 +161,16 @@ class WorkRecordRepository {
         return try {
             val snapshot = firestore.collection("work_records")
                 .whereEqualTo("companyId", companyId)
-                .orderBy("workTime", Query.Direction.DESCENDING)
                 .limit(limit.toLong())
                 .get()
                 .await()
 
             val records = snapshot.toObjects(WorkRecord::class.java)
+                .sortedByDescending { it.workTime }
+                .take(limit)
             Result.success(records)
         } catch (e: Exception) {
             Result.failure(e)
         }
-    }
-
-    // 트랜잭션 내에서 월별 집계 업데이트
-    private fun updateMonthlySummaryInTransaction(
-        transaction: Transaction,
-        workRecord: WorkRecord,
-        isAdd: Boolean
-    ) {
-        val calendar = Calendar.getInstance().apply { time = workRecord.workDate }
-        val year = calendar.get(Calendar.YEAR)
-        val month = calendar.get(Calendar.MONTH) + 1
-
-        val monthlyDocId = "${workRecord.companyId}_${year}_${month.toString().padStart(2, '0')}"
-        val monthlyRef = firestore.collection("monthly_summary").document(monthlyDocId)
-
-        // 기존 월별 데이터 조회
-        val monthlySnapshot = transaction.get(monthlyRef)
-        val existingData = if (monthlySnapshot.exists()) {
-            monthlySnapshot.toObject(MonthlySummary::class.java)!!
-        } else {
-            MonthlySummary(
-                id = monthlyDocId,
-                companyId = workRecord.companyId,
-                year = year,
-                month = month
-            )
-        }
-
-        // 데이터 업데이트
-        val updatedData = if (isAdd) {
-            monthlySummaryRepository.addWorkRecordToSummary(existingData, workRecord)
-        } else {
-            monthlySummaryRepository.removeWorkRecordFromSummary(existingData, workRecord)
-        }
-
-        transaction.set(monthlyRef, updatedData)
     }
 }
