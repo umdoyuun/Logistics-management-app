@@ -166,6 +166,7 @@
         android:layout_gravity="center"
         android:visibility="gone" />
 
+    <!-- 여기가 누락된 부분 -->
     <TextView
         android:id="@+id/tvEmpty"
         android:layout_width="wrap_content"

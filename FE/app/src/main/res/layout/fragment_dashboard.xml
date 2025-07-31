@@ -19,7 +19,7 @@
             android:textStyle="bold"
             android:layout_marginBottom="24dp" />
 
-        <!-- 오늘 통계 카드 -->
+        <!-- 오늘 작업 현황 카드 -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -35,7 +35,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="오늘 작업 현황"
+                    android:text="📦 오늘 작업 현황"
                     android:textSize="18sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="12dp" />
@@ -64,7 +64,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="파렛트"
+                            android:text="파렛트 처리"
                             android:textSize="14sp" />
 
                     </LinearLayout>
@@ -88,7 +88,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="작업 기록"
+                            android:text="작업 완료"
                             android:textSize="14sp" />
 
                     </LinearLayout>
@@ -116,7 +116,7 @@
                     android:id="@+id/tvMonthlyTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="이번 달 현황"
+                    android:text="📊 이번 달 누적 현황"
                     android:textSize="18sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="12dp" />
@@ -144,7 +144,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="파렛트"
+                            android:text="총 파렛트"
                             android:textSize="14sp" />
 
                     </LinearLayout>
@@ -167,7 +167,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="활성 유통사"
+                            android:text="협력 유통사"
                             android:textSize="14sp" />
 
                     </LinearLayout>
@@ -178,7 +178,7 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 상위 유통사 -->
+        <!-- 유통사별 작업량 순위 -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -194,9 +194,17 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="상위 유통사 (이번 달)"
+                    android:text="🏆 유통사별 작업량 순위 (이번 달)"
                     android:textSize="18sp"
                     android:textStyle="bold"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="가장 많이 작업한 유통사 TOP 5"
+                    android:textSize="12sp"
+                    android:textColor="@android:color/darker_gray"
                     android:layout_marginBottom="12dp" />
 
                 <androidx.recyclerview.widget.RecyclerView
@@ -213,7 +221,7 @@
             android:id="@+id/btnRefresh"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="새로고침"
+            android:text="🔄 새로고침"
             android:layout_marginTop="16dp" />
 
     </LinearLayout>
