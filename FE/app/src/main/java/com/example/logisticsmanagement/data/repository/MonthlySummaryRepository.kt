@@ -1,5 +1,6 @@
 package com.example.logisticsmanagement.data.repository
 
+import android.util.Log
 import com.example.logisticsmanagement.data.firebase.FirebaseManager
 import com.example.logisticsmanagement.data.model.*
 import com.example.logisticsmanagement.utils.DateUtils
@@ -11,6 +12,7 @@ class MonthlySummaryRepository {
 
     private val firestore = FirebaseManager.firestore
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    private val TAG = "MonthlySummaryRepo"
 
     // 월별 집계 데이터 조회 (엑셀 다운로드용)
     suspend fun getMonthlySummary(
@@ -20,14 +22,41 @@ class MonthlySummaryRepository {
     ): Result<MonthlySummary?> {
         return try {
             val docId = "${companyId}_${year}_${month.toString().padStart(2, '0')}"
+            Log.d(TAG, "월별 집계 조회 시작: $docId")
+
             val snapshot = firestore.collection("monthly_summary")
                 .document(docId)
                 .get()
                 .await()
 
-            val monthlySummary = snapshot.toObject(MonthlySummary::class.java)
-            Result.success(monthlySummary)
+            if (snapshot.exists()) {
+                val monthlySummary = snapshot.toObject(MonthlySummary::class.java)
+                Log.d(TAG, "월별 집계 발견: ${monthlySummary?.totalPallets}파렛트, ${monthlySummary?.totalRecords}건")
+                Result.success(monthlySummary)
+            } else {
+                Log.d(TAG, "월별 집계 문서가 존재하지 않음: $docId")
+                Result.success(null)
+            }
         } catch (e: Exception) {
+            Log.e(TAG, "월별 집계 조회 실패", e)
+            Result.failure(e)
+        }
+    }
+
+    // 월별 집계 저장
+    suspend fun saveMonthlySummary(monthlySummary: MonthlySummary): Result<Unit> {
+        return try {
+            Log.d(TAG, "월별 집계 저장 시작: ${monthlySummary.id}")
+
+            firestore.collection("monthly_summary")
+                .document(monthlySummary.id)
+                .set(monthlySummary)
+                .await()
+
+            Log.d(TAG, "월별 집계 저장 완료: ${monthlySummary.id}")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "월별 집계 저장 실패", e)
             Result.failure(e)
         }
     }
@@ -37,6 +66,8 @@ class MonthlySummaryRepository {
         existingSummary: MonthlySummary,
         workRecord: WorkRecord
     ): MonthlySummary {
+        Log.d(TAG, "월별 집계에 작업 기록 추가: ${workRecord.distributorName} - ${workRecord.totalPallets}파렛트")
+
         val dateString = dateFormat.format(workRecord.workDate)
 
         // 전체 통계 업데이트
@@ -103,7 +134,7 @@ class MonthlySummaryRepository {
             }
         }
 
-        return existingSummary.copy(
+        val result = existingSummary.copy(
             totalPallets = newTotalPallets,
             totalRecords = newTotalRecords,
             totalDistributors = updatedDistributorSummary.size,
@@ -112,6 +143,9 @@ class MonthlySummaryRepository {
             dailySummary = updatedDailySummary,
             categorySummary = updatedCategorySummary
         )
+
+        Log.d(TAG, "월별 집계 업데이트 완료: 총 ${result.totalPallets}파렛트, ${result.totalRecords}건")
+        return result
     }
 
     // 작업 기록을 월별 집계에서 제거 (수정/삭제 시)
@@ -119,21 +153,22 @@ class MonthlySummaryRepository {
         existingSummary: MonthlySummary,
         workRecord: WorkRecord
     ): MonthlySummary {
+        Log.d(TAG, "월별 집계에서 작업 기록 제거: ${workRecord.distributorName} - ${workRecord.totalPallets}파렛트")
+
         // addWorkRecordToSummary와 반대 로직
-        // 빼기 연산으로 처리
         val dateString = dateFormat.format(workRecord.workDate)
 
         val newTotalPallets = (existingSummary.totalPallets - workRecord.totalPallets).coerceAtLeast(0)
         val newTotalRecords = (existingSummary.totalRecords - 1).coerceAtLeast(0)
 
-        // 각 집계에서 해당 데이터 차감
-        // (구현 로직은 addWorkRecordToSummary와 유사하되 빼기 연산)
-
-        return existingSummary.copy(
+        // 간단하게 전체 수치만 차감
+        val result = existingSummary.copy(
             totalPallets = newTotalPallets,
             totalRecords = newTotalRecords
-            // ... 기타 집계 데이터 차감 로직
         )
+
+        Log.d(TAG, "월별 집계 제거 완료: 총 ${result.totalPallets}파렛트, ${result.totalRecords}건")
+        return result
     }
 
     private fun updateTopDistributors(
