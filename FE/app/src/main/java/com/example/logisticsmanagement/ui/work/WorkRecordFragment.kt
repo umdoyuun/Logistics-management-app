@@ -35,12 +35,28 @@ class WorkRecordFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         Log.d(TAG, "onViewCreated 호출")
 
-        viewModel = ViewModelProvider(this)[WorkRecordViewModel::class.java]
+        // ⭐ 수정: Activity 스코프로 변경하여 다이얼로그와 동일한 ViewModel 인스턴스 사용
+        viewModel = ViewModelProvider(requireActivity())[WorkRecordViewModel::class.java]
 
         setupRecyclerView()
         setupObservers()
         setupClickListeners()
+
+        // ⭐ 추가: Fragment가 표시될 때마다 데이터 새로고침
+        refreshData()
+
         Log.d(TAG, "초기화 완료")
+    }
+
+    private fun refreshData() {
+        Log.d(TAG, "데이터 새로고침 시작")
+        // 유통사 목록 로드
+        viewModel.loadDistributors()
+
+        // 현재 사용자의 회사 ID로 오늘의 작업 기록 로드
+        viewModel.currentUser.value?.let { user ->
+            viewModel.loadTodayWorkRecords(user.companyId)
+        }
     }
 
     private fun setupRecyclerView() {
@@ -72,27 +88,20 @@ class WorkRecordFragment : Fragment() {
             binding.progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
         }
 
-        viewModel.saveResult.observe(viewLifecycleOwner) { result ->
-            result?.let {
-                it.fold(
-                    onSuccess = {
-                        Toast.makeText(context, "작업 기록이 저장되었습니다", Toast.LENGTH_SHORT).show()
-                    },
-                    onFailure = { exception ->
-                        Toast.makeText(context, "저장 실패: ${exception.message}", Toast.LENGTH_LONG).show()
-                    }
-                )
-                viewModel.clearResults()
-            }
-        }
+        // ⭐ 수정: saveResult 옵저버 - 다이얼로그에서 이미 처리하므로 제거
+        // viewModel.saveResult는 다이얼로그에서 처리
 
         viewModel.deleteResult.observe(viewLifecycleOwner) { result ->
             result?.let {
                 it.fold(
                     onSuccess = {
+                        Log.d(TAG, "삭제 성공 - 자동 새로고침")
                         Toast.makeText(context, "작업 기록이 삭제되었습니다", Toast.LENGTH_SHORT).show()
+                        // ⭐ 수정: ViewModel에서 이미 새로고침하므로 중복 호출 제거
+                        // refreshData() - ViewModel의 deleteWorkRecord에서 이미 처리됨
                     },
                     onFailure = { exception ->
+                        Log.e(TAG, "삭제 실패: ${exception.message}")
                         Toast.makeText(context, "삭제 실패: ${exception.message}", Toast.LENGTH_LONG).show()
                     }
                 )
@@ -121,6 +130,13 @@ class WorkRecordFragment : Fragment() {
                 Toast.makeText(context, "다이얼로그 오류: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    // ⭐ 수정: Fragment가 다시 보일 때마다 데이터 새로고침
+    override fun onResume() {
+        super.onResume()
+        Log.d(TAG, "onResume - 데이터 새로고침")
+        // onResume에서는 굳이 새로고침하지 않음 (ViewModel이 이미 최신 상태 유지)
     }
 
     override fun onDestroyView() {
