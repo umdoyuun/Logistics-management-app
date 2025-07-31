@@ -41,13 +41,19 @@ class AddWorkRecordDialogFragment : DialogFragment() {
         Log.d(TAG, "onViewCreated 호출")
 
         try {
-            // requireParentFragment() 대신 requireActivity() 사용
+            // Activity 스코프 사용 (WorkRecordFragment와 동일)
             viewModel = ViewModelProvider(requireActivity())[WorkRecordViewModel::class.java]
             Log.d(TAG, "ViewModel 생성 성공")
 
             setupUI()
             setupObservers()
             setupClickListeners()
+
+            // ⭐ 추가: 다이얼로그 표시 시 유통사 목록 로드 (필요시만)
+            if (viewModel.distributors.value.isNullOrEmpty()) {
+                viewModel.loadDistributors()
+            }
+
             Log.d(TAG, "초기화 완료")
         } catch (e: Exception) {
             Log.e(TAG, "초기화 중 오류", e)
@@ -63,7 +69,10 @@ class AddWorkRecordDialogFragment : DialogFragment() {
     }
 
     private fun setupObservers() {
+        Log.d(TAG, "Observer 설정 시작")
+
         viewModel.distributors.observe(viewLifecycleOwner) { distributors ->
+            Log.d(TAG, "유통사 목록 업데이트: ${distributors.size}개")
             if (distributors.isNotEmpty()) {
                 val adapter = ArrayAdapter(
                     requireContext(),
@@ -77,26 +86,39 @@ class AddWorkRecordDialogFragment : DialogFragment() {
             }
         }
 
+        // ⭐ 수정: saveResult 관찰 - 한 번만 처리하고 다이얼로그 닫기
         viewModel.saveResult.observe(viewLifecycleOwner) { result ->
             result?.let {
+                Log.d(TAG, "저장 결과 받음: ${it.isSuccess}")
                 it.fold(
                     onSuccess = {
+                        Log.d(TAG, "저장 성공, 다이얼로그 닫기")
                         Toast.makeText(context, "작업 기록이 저장되었습니다", Toast.LENGTH_SHORT).show()
+
+                        // ⭐ 수정: 즉시 다이얼로그 닫기
                         dismiss()
                     },
                     onFailure = { exception ->
+                        Log.e(TAG, "저장 실패: ${exception.message}")
                         Toast.makeText(context, "저장 실패: ${exception.message}", Toast.LENGTH_LONG).show()
+                        // 저장 실패시 버튼 다시 활성화
+                        binding.btnSave.isEnabled = true
                     }
                 )
+                // ⭐ 수정: 다이얼로그에서 결과 처리 후 클리어
+                viewModel.clearResults()
             }
         }
 
         viewModel.errorMessage.observe(viewLifecycleOwner) { message ->
             if (message.isNotEmpty()) {
+                Log.d(TAG, "에러 메시지: $message")
                 Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                 viewModel.clearErrorMessage()
             }
         }
+
+        Log.d(TAG, "Observer 설정 완료")
     }
 
     private fun setupClickListeners() {
@@ -180,6 +202,10 @@ class AddWorkRecordDialogFragment : DialogFragment() {
             notes = notes
         )
 
+        // ⭐ 추가: 저장 버튼 비활성화 (중복 클릭 방지)
+        binding.btnSave.isEnabled = false
+
+        Log.d(TAG, "작업 기록 저장 요청: ${request.distributorId}, ${request.totalPallets}파렛트")
         viewModel.saveWorkRecord(request)
     }
 
