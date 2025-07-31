@@ -2,18 +2,26 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/nav_dashboard"
-        android:icon="@drawable/ic_dashboard"
+        android:icon="@android:drawable/ic_dialog_info"
         android:title="대시보드" />
+
     <item
         android:id="@+id/nav_work_record"
-        android:icon="@drawable/ic_work"
+        android:icon="@android:drawable/ic_menu_edit"
         android:title="작업기록" />
+
+    <item
+        android:id="@+id/nav_distributor"
+        android:icon="@android:drawable/ic_menu_manage"
+        android:title="유통사관리" />
+
     <item
         android:id="@+id/nav_report"
-        android:icon="@drawable/ic_report"
+        android:icon="@android:drawable/ic_menu_view"
         android:title="리포트" />
+
     <item
         android:id="@+id/nav_profile"
-        android:icon="@drawable/ic_profile"
+        android:icon="@android:drawable/ic_menu_myplaces"
         android:title="프로필" />
 </menu>
