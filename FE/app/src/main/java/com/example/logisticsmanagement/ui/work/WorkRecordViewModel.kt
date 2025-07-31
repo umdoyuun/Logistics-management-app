@@ -312,6 +312,7 @@ class WorkRecordViewModel : ViewModel() {
 
     // 결과 클리어
     fun clearResults() {
+        Log.d(TAG, "결과 클리어")
         _saveResult.value = null
         _updateResult.value = null
         _deleteResult.value = null

@@ -63,7 +63,10 @@ class AddWorkRecordDialogFragment : DialogFragment() {
     }
 
     private fun setupObservers() {
+        Log.d(TAG, "Observer 설정 시작")
+
         viewModel.distributors.observe(viewLifecycleOwner) { distributors ->
+            Log.d(TAG, "유통사 목록 업데이트: ${distributors.size}개")
             if (distributors.isNotEmpty()) {
                 val adapter = ArrayAdapter(
                     requireContext(),
@@ -77,26 +80,35 @@ class AddWorkRecordDialogFragment : DialogFragment() {
             }
         }
 
+        // saveResult 관찰 - 한 번만 처리하고 다이얼로그 닫기
         viewModel.saveResult.observe(viewLifecycleOwner) { result ->
             result?.let {
+                Log.d(TAG, "저장 결과 받음: ${it.isSuccess}")
                 it.fold(
                     onSuccess = {
+                        Log.d(TAG, "저장 성공, 다이얼로그 닫기")
                         Toast.makeText(context, "작업 기록이 저장되었습니다", Toast.LENGTH_SHORT).show()
                         dismiss()
                     },
                     onFailure = { exception ->
+                        Log.e(TAG, "저장 실패: ${exception.message}")
                         Toast.makeText(context, "저장 실패: ${exception.message}", Toast.LENGTH_LONG).show()
                     }
                 )
+                // 처리 후 즉시 결과 클리어 (중요!)
+                viewModel.clearResults()
             }
         }
 
         viewModel.errorMessage.observe(viewLifecycleOwner) { message ->
             if (message.isNotEmpty()) {
+                Log.d(TAG, "에러 메시지: $message")
                 Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                 viewModel.clearErrorMessage()
             }
         }
+
+        Log.d(TAG, "Observer 설정 완료")
     }
 
     private fun setupClickListeners() {
